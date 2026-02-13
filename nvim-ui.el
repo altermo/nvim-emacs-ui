@@ -1,0 +1,95 @@
+;; -*- lexical-binding: t; -*-
+
+(require 'mpack)
+(require 'nvim-key-conv)
+(require 'seq)
+(defun nvim-ui--get_size ()
+  (let ((wins (get-buffer-window-list (process-buffer nvim-ui-proc))))
+    (let ((width (frame-width)) (height (frame-height)))
+      (dolist (win wins (progn
+                          (setq width (1- width))
+                          (setq height (1- height))
+                          (setq-local nvim-ui-width width)
+                          (setq-local nvim-ui-height height)
+                          (cons width height)))
+        (if (< (window-width win) width)
+          (setq width (window-width win)))
+        (if (< (window-height win) height)
+          (setq height (window-height win)))))))
+
+(defun nvim-ui--handle-event-queue ()
+  (dolist (event (nreverse nvim-ui-event-queue))
+    (let ((m (aref event 0))
+          (args (seq-subseq event 1)))
+      (cond
+        ((equal m "grid_line")
+         (seq-doseq
+           (arg args)
+           (let* ((grid (aref arg 0))
+                 (row (aref arg 1))
+                 (col_start (aref arg 2))
+                 (cells (aref arg 3))
+                 (wrap (aref arg 4))
+                 (pos (+ (* (1+ nvim-ui-width) row) col_start 1))
+                 )
+             (with-current-buffer
+               (process-buffer nvim-ui-proc)
+               (let ((inhibit-read-only t))
+                 (seq-doseq
+                   (cell cells)
+                   (goto-char pos)
+                   (let ((text (aref cell 0))
+                         (rep (if (>= (length cell) 3) (aref cell 2) 1)))
+                     (delete-char rep)
+                     (dotimes (_ rep)
+                       (insert text))
+                     (setq pos (+ pos rep))
+                     )))))))
+        )))
+  (setq nvim-ui-event-queue '()))
+
+(defun nvim-ui--proc-filter (proc out)
+  (dolist (data (mpack-decode-multi out))
+    (when (and (vectorp data) (= (length data) 3)
+             (= (aref data 0) 2)
+             (equal (aref data 1) "redraw")
+             (vectorp (aref data 2)))
+      (seq-doseq
+        (event (aref data 2))
+        (if (equal (aref event 0) "flush")
+          (nvim-ui--handle-event-queue)
+          (setq nvim-ui-event-queue
+                (cons event nvim-ui-event-queue)))))))
+; (defun nvim-ui--proc-filter (proc out)
+;   (internal-default-process-filter proc (prin1-to-string (mpack-decode-multi out))))
+
+(defun nvim-ui-notify (command &rest args)
+  (process-send-string nvim-ui-proc (mpack-encode (vector 2 command (vconcat args)))))
+
+(define-derived-mode nvim-ui-mode special-mode "nvim-ui" ""
+  (setq-local nvim-ui-proc (make-process
+                             :name "nvim"
+                             :buffer (current-buffer)
+                             :filter #'nvim-ui--proc-filter
+                             :connection-type 'pipe
+                             :coding 'no-conversion
+                             :command '("nvim" "--embed")))
+  (setq-local nvim-ui-event-queue '())
+
+  (let* ((size (nvim-ui--get_size))
+         (width (car size))
+         (height (cdr size)))
+    (let ((inhibit-read-only t))
+      (dotimes (_ height)
+        (insert (make-string width 32))
+        (insert "\n")))
+    (beginning-of-buffer)
+    (nvim-ui-notify
+      "nvim_ui_attach" width height '(
+                                      "ext_linegrid" t
+                                      )))
+  ; TODO: a hook to close the proces on mode exit/buffer delete
+  ; TODO: a hook to refresh size
+  )
+
+(provide 'nvim-ui)
