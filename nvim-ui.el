@@ -26,12 +26,11 @@
          (seq-doseq
            (arg args)
            (let* ((grid (aref arg 0))
-                 (row (aref arg 1))
-                 (col_start (aref arg 2))
-                 (cells (aref arg 3))
-                 (wrap (aref arg 4))
-                 (pos (+ (* (1+ nvim-ui-width) row) col_start 1))
-                 )
+                  (row (aref arg 1))
+                  (col_start (aref arg 2))
+                  (cells (aref arg 3))
+                  (wrap (aref arg 4))
+                  (pos (+ (* (1+ nvim-ui-width) row) col_start 1)))
              (with-current-buffer
                (process-buffer nvim-ui-proc)
                (let ((inhibit-read-only t))
@@ -51,9 +50,9 @@
 (defun nvim-ui--proc-filter (proc out)
   (dolist (data (mpack-decode-multi out))
     (when (and (vectorp data) (= (length data) 3)
-             (= (aref data 0) 2)
-             (equal (aref data 1) "redraw")
-             (vectorp (aref data 2)))
+               (= (aref data 0) 2)
+               (equal (aref data 1) "redraw")
+               (vectorp (aref data 2)))
       (seq-doseq
         (event (aref data 2))
         (if (equal (aref event 0) "flush")
@@ -66,7 +65,19 @@
 (defun nvim-ui-notify (command &rest args)
   (process-send-string nvim-ui-proc (mpack-encode (vector 2 command (vconcat args)))))
 
-(define-derived-mode nvim-ui-mode special-mode "nvim-ui" ""
+(defvar nvim-ui-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key
+      map [t]
+      (lambda ()
+        (interactive)
+        (let ((key (nvim-key-conv (this-command-keys-vector))))
+          (if (> (length key) 0)
+            (nvim-ui-notify "nvim_input" key)))))
+    map))
+
+(define-derived-mode
+  nvim-ui-mode fundamental-mode "nvim-ui" ""
   (setq-local nvim-ui-proc (make-process
                              :name "nvim"
                              :buffer (current-buffer)

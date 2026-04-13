@@ -3,7 +3,8 @@
 (require 'seq)
 
 (setq nvim-key-conv-map
-      '((?\t . "Tab")
+      '((backspace . "BS")
+        (?\t . "Tab")
         (tab . "Tab")
         (linefeed . "NL")
         (?\r . "CR")
