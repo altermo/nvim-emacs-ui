@@ -3,7 +3,7 @@
 (require 'mpack)
 (require 'nvim-key-conv)
 (require 'seq)
-(defun nvim-ui--get_size ()
+(defun nvim-ui--get-size ()
   (let ((wins (get-buffer-window-list (process-buffer nvim-ui-proc))))
     (let ((width (frame-width)) (height (frame-height)))
       (dolist (win wins (progn
@@ -44,7 +44,20 @@
                        (insert text))
                      (setq pos (+ pos rep))
                      )))))))
+        ((equal m "grid_cursor_goto")
+         (seq-doseq
+           (arg args)
+           (let* ((grid (aref arg 0))
+                  (row (aref arg 1))
+                  (col (aref arg 2))
+                  (pos (+ (* (1+ nvim-ui-width) row) col 1)))
+             (setq-local nvim-ui-point pos)
+             )))
         )))
+  (if (boundp 'nvim-ui-point)
+    (with-current-buffer
+      (process-buffer nvim-ui-proc)
+      (goto-char nvim-ui-point)))
   (setq nvim-ui-event-queue '()))
 
 (defun nvim-ui--proc-filter (proc out)
@@ -87,7 +100,7 @@
                              :command '("nvim" "--embed")))
   (setq-local nvim-ui-event-queue '())
 
-  (let* ((size (nvim-ui--get_size))
+  (let* ((size (nvim-ui--get-size))
          (width (car size))
          (height (cdr size)))
     (let ((inhibit-read-only t))
