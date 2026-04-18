@@ -162,7 +162,7 @@
          ((= dbyte #xdd)  (cons 'vec 4))
          ((= dbyte #xde)  (cons 'map 2))
          ((= dbyte #xdf)  (cons 'map 4))
-         ((>= dbyte #xe0) (cons 'const (- #x100 dbyte)))
+         ((>= dbyte #xe0) (cons 'const (- dbyte #x100)))
          (t (signal 'args-out-of-range (list dbyte 0 255)))))
      (dtype (car dinfo))
      (darg (cdr dinfo))
