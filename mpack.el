@@ -219,12 +219,9 @@
       (t (signal 'error (list dtype dinfo dlen pos))))))
 
 (defun mpack-decode-multi (data)
-  (let ((pos (list -1)) (top '()) (bot '()))
+  (let ((pos (list -1)) (out '()))
     (while (< (1+ (car pos)) (length data))
-           (if top
-             (setcdr bot (list (mpack-decode data pos)))
-             (setq bot (list (mpack-decode data pos)))
-             (setq top bot)))
-    top))
+           (setq out (cons (mpack-decode data pos) out)))
+    (nreverse out)))
 
 (provide 'mpack)
