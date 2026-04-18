@@ -30,7 +30,8 @@
                   (col_start (aref arg 2))
                   (cells (aref arg 3))
                   (wrap (aref arg 4))
-                  (pos (+ (* (1+ nvim-ui-width) row) col_start 1)))
+                  (pos (+ (* (1+ nvim-ui-width) row) col_start 1))
+                  face)
              (with-current-buffer
                (process-buffer nvim-ui-proc)
                (let ((inhibit-read-only t))
@@ -38,10 +39,13 @@
                    (cell cells)
                    (goto-char pos)
                    (let ((text (aref cell 0))
+                         (hl-id (if (>= (length cell) 2) (aref cell 1)))
                          (rep (if (>= (length cell) 3) (aref cell 2) 1)))
+                     (if hl-id
+                       (setq face (gethash hl-id nvim-ui-hl-tbl)))
                      (delete-char rep)
                      (dotimes (_ rep)
-                       (insert text))
+                       (insert (propertize text 'face face)))
                      (setq pos (+ pos rep))
                      )))))))
         ((equal m "grid_scroll")
@@ -76,6 +80,66 @@
                   (pos (+ (* (1+ nvim-ui-width) row) col 1)))
              (setq-local nvim-ui-point pos)
              )))
+        ((equal m "hl_attr_define")
+         (seq-doseq
+           (arg args)
+           (let* ((id (aref arg 0))
+                  (rgb_attr (aref arg 1))
+                  (cterm_attr (aref arg 2))
+                  (info (aref arg 3))
+
+                  (foreground (plist-get rgb_attr "foreground" 'equal))
+                  (background (plist-get rgb_attr "background" 'equal))
+                  (special (plist-get rgb_attr "special" 'equal))
+                  underline
+                  face)
+             (if foreground
+               (setq foreground (format "#%06x" foreground)))
+             (if background
+               (setq background (format "#%06x" background)))
+             (if special
+               (setq special (format "#%06x" special)))
+             (if (plist-get rgb_attr "reverse" 'equal)
+               (let ((tmp foreground))
+                 (setq foreground background)
+                 (setq background tmp)))
+             (if (plist-get rgb_attr "italic" 'equal)
+               (setq face (plist-put face :slant 'italic)))
+             (if (plist-get rgb_attr "bold" 'equal)
+               (setq face (plist-put face :weight 'bold)))
+             (if (plist-get rgb_attr "strikethrough" 'equal)
+               (setq face (plist-put face :strike-through t)))
+             (cond
+               ((plist-get rgb_attr "underline" 'equal)
+                (setq underline 'line))
+               ((plist-get rgb_attr "undercurl" 'equal)
+                (setq underline 'wave)))
+             (if underline
+               (setq face (plist-put face :underline
+                                     (list
+                                       :color (or special 'foreground-color)
+                                       :style underline))))
+             (if foreground
+               (setq face (plist-put face :foreground foreground)))
+             (if background
+               (setq face (plist-put face :background background)))
+             (puthash id face nvim-ui-hl-tbl)
+             )))
+        ((equal m "default_colors_set")
+         (seq-doseq
+           (arg args)
+           (let ((rgb_fg (aref arg 0))
+                 (rgb_bg (aref arg 1))
+                 (rgb_sp (aref arg 2))
+                 (cterm_fg (aref arg 3))
+                 (cterm_bg (aref arg 4)))
+             (with-current-buffer
+               (process-buffer nvim-ui-proc)
+               (setq-local face-remapping-alist
+                           `((default
+                               :foreground ,(format "#%06x" rgb_fg)
+                               :background ,(format "#%06x" rgb_bg))))
+               ))))
         )))
   (if (boundp 'nvim-ui-point)
     (with-current-buffer
@@ -122,6 +186,7 @@
                              :coding 'no-conversion
                              :command '("nvim" "--embed")))
   (setq-local nvim-ui-event-queue '())
+  (setq-local nvim-ui-hl-tbl (make-hash-table))
 
   (let* ((size (nvim-ui--get-size))
          (width (car size))
