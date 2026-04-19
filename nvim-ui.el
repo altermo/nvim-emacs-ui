@@ -178,6 +178,8 @@
 
 (define-derived-mode
   nvim-ui-mode fundamental-mode "nvim-ui" ""
+  (buffer-disable-undo)
+  (setq buffer-read-only t)
   (setq-local nvim-ui-proc (make-process
                              :name "nvim"
                              :buffer (current-buffer)
@@ -200,8 +202,12 @@
       "nvim_ui_attach" width height '(
                                       "ext_linegrid" t
                                       )))
-  ; TODO: a hook to close the proces on mode exit/buffer delete
   ; TODO: a hook to refresh size
   )
+
+(defun nvim ()
+  (interactive)
+  (switch-to-buffer (generate-new-buffer "*nvim*"))
+  (nvim-ui-mode))
 
 (provide 'nvim-ui)
