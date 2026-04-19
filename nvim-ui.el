@@ -205,7 +205,9 @@
                              :filter #'nvim-ui--proc-filter
                              :connection-type 'pipe
                              :coding 'no-conversion
-                             :command '("nvim" "--embed")))
+                             :command '("nvim" "--embed")
+                             :sentinel (lambda (proc _)
+                                         (kill-buffer (process-buffer proc)))))
   (setq-local nvim-ui-event-queue '())
   (setq-local nvim-ui-hl-tbl (make-hash-table))
 
