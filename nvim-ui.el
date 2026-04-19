@@ -174,6 +174,25 @@
         (let ((key (nvim-key-conv (this-command-keys-vector))))
           (if (> (length key) 0)
             (nvim-ui-notify "nvim_input" key)))))
+    (define-key
+      map (kbd "C-1 C-2")
+      (lambda ()
+        (interactive)
+        (use-local-map nvim-ui-mode-normal-map)))
+    (define-key
+      map (kbd "C-1 C-1")
+      (lambda ()
+        (interactive)
+        (nvim-ui-notify "nvim_input" "<C-1>")))
+    map))
+
+(defvar nvim-ui-mode-normal-map
+  (let ((map (make-sparse-keymap)))
+    (define-key
+      map (kbd "C-1")
+      (lambda ()
+        (interactive)
+        (use-local-map nvim-ui-mode-map)))
     map))
 
 (define-derived-mode
